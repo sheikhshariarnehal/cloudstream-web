@@ -1,8 +1,10 @@
 # Gradle
 .gradle/
+.kotlin/
 build/
 server/build/
 server/.gradle/
+server/.kotlin/
 
 # Node
 node_modules/
