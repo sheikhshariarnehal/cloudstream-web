@@ -19,10 +19,11 @@ fun Route.streamProxyRoutes() {
                 return@get
             }
 
-            val targetUrl = try { URLDecoder.decode(rawUrl, "UTF-8") } catch (_: Exception) { rawUrl }
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
+            val safeUrl = targetUrl.replace(" ", "%20")
             val session = ProxySessionManager.getSession(sessionId)
 
-            val reqBuilder = Request.Builder().url(targetUrl)
+            val reqBuilder = Request.Builder().url(safeUrl)
             session?.headers?.forEach { (k, v) -> reqBuilder.header(k, v) }
             if (session?.headers?.keys?.none { it.equals("user-agent", ignoreCase = true) } != false) {
                 reqBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -43,7 +44,7 @@ fun Route.streamProxyRoutes() {
             }
 
             val rawBody = response.body?.string() ?: ""
-            val rewritten = HlsPlaylistRewriter.rewritePlaylist(rawBody, targetUrl, sessionId)
+            val rewritten = HlsPlaylistRewriter.rewritePlaylist(rawBody, safeUrl, sessionId)
 
             call.response.headers.append("Access-Control-Allow-Origin", "*")
             call.response.headers.append("Access-Control-Allow-Headers", "*")
@@ -58,10 +59,11 @@ fun Route.streamProxyRoutes() {
                 return@get
             }
 
-            val targetUrl = try { URLDecoder.decode(rawUrl, "UTF-8") } catch (_: Exception) { rawUrl }
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
+            val safeUrl = targetUrl.replace(" ", "%20")
             val session = ProxySessionManager.getSession(sessionId)
 
-            val reqBuilder = Request.Builder().url(targetUrl)
+            val reqBuilder = Request.Builder().url(safeUrl)
             session?.headers?.forEach { (k, v) -> reqBuilder.header(k, v) }
             if (session?.headers?.keys?.none { it.equals("user-agent", ignoreCase = true) } != false) {
                 reqBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -81,14 +83,12 @@ fun Route.streamProxyRoutes() {
 
             val statusCode = HttpStatusCode.fromValue(response.code)
             val contentTypeStr = response.header("Content-Type") ?: "video/MP2T"
-            val contentLength = response.header("Content-Length")
             val contentRange = response.header("Content-Range")
 
             call.response.headers.append("Access-Control-Allow-Origin", "*")
             call.response.headers.append("Access-Control-Allow-Headers", "*")
-            call.response.headers.append("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
+            call.response.headers.append("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
             call.response.headers.append("Accept-Ranges", "bytes")
-            if (contentLength != null) call.response.headers.append("Content-Length", contentLength)
             if (contentRange != null) call.response.headers.append("Content-Range", contentRange)
 
             val bodyStream = response.body?.byteStream()
@@ -106,6 +106,55 @@ fun Route.streamProxyRoutes() {
             }
         }
 
+        head("/video") {
+            val rawUrl = call.request.queryParameters["url"]
+            val sessionId = call.request.queryParameters["sessionId"] ?: ""
+            if (rawUrl.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest)
+                return@head
+            }
+
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
+            val safeUrl = targetUrl.replace(" ", "%20")
+            val session = ProxySessionManager.getSession(sessionId)
+
+            val reqBuilder = Request.Builder().url(safeUrl).head()
+            session?.headers?.forEach { (k, v) -> reqBuilder.header(k, v) }
+            if (session?.headers?.keys?.none { it.equals("user-agent", ignoreCase = true) } != false) {
+                reqBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+            }
+
+            val response = try {
+                app.baseClient.newCall(reqBuilder.build()).execute()
+            } catch (_: Exception) {
+                call.respond(HttpStatusCode.BadGateway)
+                return@head
+            }
+
+            val statusCode = HttpStatusCode.fromValue(response.code)
+            val rawContentType = response.header("Content-Type")
+            val contentTypeStr = if (rawContentType.isNullOrBlank() || rawContentType == "application/octet-stream") {
+                when {
+                    safeUrl.contains(".mp4", ignoreCase = true) -> "video/mp4"
+                    safeUrl.contains(".mkv", ignoreCase = true) -> "video/x-matroska"
+                    safeUrl.contains(".webm", ignoreCase = true) -> "video/webm"
+                    safeUrl.contains(".avi", ignoreCase = true) -> "video/x-msvideo"
+                    else -> "video/mp4"
+                }
+            } else {
+                rawContentType
+            }
+            val contentLength = response.header("Content-Length")
+
+            call.response.headers.append("Access-Control-Allow-Origin", "*")
+            call.response.headers.append("Access-Control-Allow-Headers", "*")
+            call.response.headers.append("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
+            call.response.headers.append("Accept-Ranges", "bytes")
+            if (contentLength != null) call.response.headers.append("Content-Length", contentLength)
+            response.close()
+            call.respondBytes(ByteArray(0), ContentType.parse(contentTypeStr), statusCode)
+        }
+
         get("/video") {
             // Direct MP4 / MKV video stream proxy with HTTP Range forwarding
             val rawUrl = call.request.queryParameters["url"]
@@ -115,10 +164,11 @@ fun Route.streamProxyRoutes() {
                 return@get
             }
 
-            val targetUrl = try { URLDecoder.decode(rawUrl, "UTF-8") } catch (_: Exception) { rawUrl }
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
+            val safeUrl = targetUrl.replace(" ", "%20")
             val session = ProxySessionManager.getSession(sessionId)
 
-            val reqBuilder = Request.Builder().url(targetUrl)
+            val reqBuilder = Request.Builder().url(safeUrl)
             session?.headers?.forEach { (k, v) -> reqBuilder.header(k, v) }
             if (session?.headers?.keys?.none { it.equals("user-agent", ignoreCase = true) } != false) {
                 reqBuilder.header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -137,15 +187,24 @@ fun Route.streamProxyRoutes() {
             }
 
             val statusCode = HttpStatusCode.fromValue(response.code)
-            val contentTypeStr = response.header("Content-Type") ?: "video/mp4"
-            val contentLength = response.header("Content-Length")
+            val rawContentType = response.header("Content-Type")
+            val contentTypeStr = if (rawContentType.isNullOrBlank() || rawContentType == "application/octet-stream") {
+                when {
+                    safeUrl.contains(".mp4", ignoreCase = true) -> "video/mp4"
+                    safeUrl.contains(".mkv", ignoreCase = true) -> "video/x-matroska"
+                    safeUrl.contains(".webm", ignoreCase = true) -> "video/webm"
+                    safeUrl.contains(".avi", ignoreCase = true) -> "video/x-msvideo"
+                    else -> "video/mp4"
+                }
+            } else {
+                rawContentType
+            }
             val contentRange = response.header("Content-Range")
 
             call.response.headers.append("Access-Control-Allow-Origin", "*")
             call.response.headers.append("Access-Control-Allow-Headers", "*")
-            call.response.headers.append("Access-Control-Expose-Headers", "Content-Length, Content-Range, Accept-Ranges")
+            call.response.headers.append("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges")
             call.response.headers.append("Accept-Ranges", "bytes")
-            if (contentLength != null) call.response.headers.append("Content-Length", contentLength)
             if (contentRange != null) call.response.headers.append("Content-Range", contentRange)
 
             val bodyStream = response.body?.byteStream()
@@ -171,8 +230,9 @@ fun Route.streamProxyRoutes() {
                 return@get
             }
 
-            val targetUrl = try { URLDecoder.decode(rawUrl, "UTF-8") } catch (_: Exception) { rawUrl }
-            val req = Request.Builder().url(targetUrl).build()
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
+            val safeUrl = targetUrl.replace(" ", "%20")
+            val req = Request.Builder().url(safeUrl).build()
             val response = try {
                 app.baseClient.newCall(req).execute()
             } catch (e: Exception) {

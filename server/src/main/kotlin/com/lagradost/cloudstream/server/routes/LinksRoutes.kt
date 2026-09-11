@@ -27,7 +27,7 @@ fun Route.linksRoutes() {
                 return@get
             }
 
-            val data = try { URLDecoder.decode(rawData, "UTF-8") } catch (_: Exception) { rawData }
+            println("[LinksRoutes] Request: apiName='$apiName', rawData='$rawData'")
             val provider = ServerPluginLoader.getProvider(apiName)
             if (provider == null) {
                 call.respond(HttpStatusCode.NotFound, "Provider $apiName not found")
@@ -37,46 +37,80 @@ fun Route.linksRoutes() {
             val extractedLinks = CopyOnWriteArrayList<StreamLinkDTO>()
             val extractedSubs = CopyOnWriteArrayList<SubtitleDTO>()
 
-            try {
-                provider.loadLinks(
-                    data = data,
-                    isCasting = false,
-                    subtitleCallback = { sub: SubtitleFile ->
-                        val encodedSubUrl = URLEncoder.encode(sub.url, "UTF-8")
-                        extractedSubs.add(
-                            SubtitleDTO(
-                                id = null,
-                                lang = sub.lang,
-                                url = "/api/proxy/sub?url=$encodedSubUrl",
-                                autoSelect = false
-                            )
-                        )
-                    },
-                    callback = { link: ExtractorLink ->
-                        val isM3u8 = link.type == ExtractorLinkType.M3U8 || link.url.contains(".m3u8", ignoreCase = true)
-                        val sessionId = ProxySessionManager.createSession(link.url, link.headers)
-                        val encodedUrl = URLEncoder.encode(link.url, "UTF-8")
-                        val proxyEndpoint = if (isM3u8) "/api/proxy/m3u8" else "/api/proxy/video"
-                        val proxiedUrl = "$proxyEndpoint?url=$encodedUrl&sessionId=$sessionId"
-
-                        extractedLinks.add(
-                            StreamLinkDTO(
-                                name = link.name,
-                                url = proxiedUrl,
-                                rawUrl = link.url,
-                                referer = link.referer,
-                                quality = link.quality,
-                                isM3u8 = isM3u8,
-                                headers = link.headers
-                            )
-                        )
-                    }
+            val subCallback: (SubtitleFile) -> Unit = { sub: SubtitleFile ->
+                println("[LinksRoutes] Subtitle extracted: ${sub.url}")
+                val encodedSubUrl = URLEncoder.encode(sub.url, "UTF-8")
+                extractedSubs.add(
+                    SubtitleDTO(
+                        id = null,
+                        lang = sub.lang,
+                        url = "/api/proxy/sub?url=$encodedSubUrl",
+                        autoSelect = false
+                    )
                 )
+            }
 
-                // Sort links by quality descending (1080p, 720p, etc.)
+            val linkCallback: (ExtractorLink) -> Unit = { link: ExtractorLink ->
+                println("[LinksRoutes] Link extracted: ${link.name} | ${link.url}")
+                val isM3u8 = link.type == ExtractorLinkType.M3U8 || link.url.contains(".m3u8", ignoreCase = true)
+                val sessionId = ProxySessionManager.createSession(link.url, link.headers)
+                val encodedUrl = URLEncoder.encode(link.url, "UTF-8")
+                val proxyEndpoint = if (isM3u8) "/api/proxy/m3u8" else "/api/proxy/video"
+                val proxiedUrl = "$proxyEndpoint?url=$encodedUrl&sessionId=$sessionId"
+
+                extractedLinks.add(
+                    StreamLinkDTO(
+                        name = link.name,
+                        url = proxiedUrl,
+                        rawUrl = link.url,
+                        referer = link.referer,
+                        quality = link.quality,
+                        isM3u8 = isM3u8,
+                        headers = link.headers
+                    )
+                )
+            }
+
+            try {
+                // First attempt with rawData (as received from client, preserving %20 if encoded)
+                println("[LinksRoutes] Attempting loadLinks with rawData: $rawData")
+                var success = try {
+                    provider.loadLinks(rawData, false, subCallback, linkCallback)
+                } catch (t: Throwable) {
+                    println("[LinksRoutes] Error with rawData: ${t.message}")
+                    false
+                }
+
+                // If no links found, attempt with decoded or encoded data
+                if (extractedLinks.isEmpty()) {
+                    val decodedData = try { URLDecoder.decode(rawData, "UTF-8") } catch (_: Exception) { rawData }
+                    if (decodedData != rawData) {
+                        println("[LinksRoutes] Attempting loadLinks with decodedData: $decodedData")
+                        try {
+                            provider.loadLinks(decodedData, false, subCallback, linkCallback)
+                        } catch (t: Throwable) {
+                            println("[LinksRoutes] Error with decodedData: ${t.message}")
+                        }
+                    }
+                }
+
+                // If still empty and contains spaces, attempt with URI path encoded
+                if (extractedLinks.isEmpty() && (rawData.contains(" ") || rawData.contains("(") || rawData.contains(")"))) {
+                    val fixedUrl = rawData.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+                    println("[LinksRoutes] Attempting loadLinks with fixedUrl: $fixedUrl")
+                    try {
+                        provider.loadLinks(fixedUrl, false, subCallback, linkCallback)
+                    } catch (t: Throwable) {
+                        println("[LinksRoutes] Error with fixedUrl: ${t.message}")
+                    }
+                }
+
+                println("[LinksRoutes] Finished. Total extracted links: ${extractedLinks.size}")
                 val sortedLinks = extractedLinks.sortedByDescending { it.quality }
                 call.respond(LoadLinksResponseDTO(links = sortedLinks, subtitles = extractedSubs.distinctBy { it.url }))
             } catch (e: Exception) {
+                println("[LinksRoutes] Fatal exception: ${e.message}")
+                e.printStackTrace()
                 call.respond(HttpStatusCode.InternalServerError, "Error extracting links: ${e.message}")
             }
         }

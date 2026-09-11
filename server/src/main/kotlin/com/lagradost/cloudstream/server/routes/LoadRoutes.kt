@@ -22,7 +22,7 @@ fun Route.loadRoutes() {
                 return@get
             }
 
-            val targetUrl = try { URLDecoder.decode(rawUrl, "UTF-8") } catch (_: Exception) { rawUrl }
+            val targetUrl = try { if (rawUrl.contains("%")) URLDecoder.decode(rawUrl, "UTF-8") else rawUrl } catch (_: Exception) { rawUrl }
             val provider = ServerPluginLoader.getProvider(apiName)
             if (provider == null) {
                 call.respond(HttpStatusCode.NotFound, "Provider $apiName not found")
@@ -30,7 +30,10 @@ fun Route.loadRoutes() {
             }
 
             try {
-                val response = provider.load(targetUrl)
+                var response = try { provider.load(targetUrl) } catch (_: Exception) { null }
+                if (response == null && targetUrl != rawUrl) {
+                    response = try { provider.load(rawUrl) } catch (_: Exception) { null }
+                }
                 if (response == null) {
                     call.respond(HttpStatusCode.NotFound, "No data returned by provider")
                     return@get

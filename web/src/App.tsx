@@ -96,11 +96,15 @@ export const App: React.FC = () => {
   const loadProvidersList = async () => {
     try {
       const list = await getProviders()
-      setProviders(list)
-      // Pick first provider with home page or default to VegaMovies
-      const homeProv = list.find((p) => p.name === 'VegaMovies') || list.find((p) => p.hasMainPage) || list[0]
-      if (homeProv) {
-        setSelectedHomeProvider(homeProv.name)
+      if (Array.isArray(list) && list.length > 0) {
+        setProviders(list)
+        // Pick first provider with home page or default to VegaMovies
+        const homeProv = list.find((p) => p.name === 'VegaMovies') || list.find((p) => p.hasMainPage) || list[0]
+        if (homeProv) {
+          setSelectedHomeProvider(homeProv.name)
+        }
+      } else {
+        console.warn('getProviders did not return an array', list)
       }
     } catch (err) {
       console.error('Failed to load providers', err)

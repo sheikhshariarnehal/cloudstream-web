@@ -208,7 +208,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Active Provider Selector */}
-        {providers.length > 0 && (
+        {Array.isArray(providers) && providers.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <Globe size={16} color="var(--accent-red)" />
             <select
