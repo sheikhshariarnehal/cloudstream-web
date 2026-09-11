@@ -296,31 +296,31 @@ d:/Poject/CloudStream/cloudstream-web/
 ## Implementation Phases & Verification Plan
 
 ### Phase 1: Ktor Headless Engine & Stream Proxy Foundation
-- [ ] Initialize `cloudstream-web/server` Gradle project with Ktor, OkHttp, and `software.coley.dextranslator`.
-- [ ] Implement `ServerPluginLoader` porting `DesktopPluginLoader` logic for DEX-to-JVM translation.
-- [ ] Implement `RepoManager` with shortcode resolution (`cspr`, `megarepo`, `phisherrepo`, `csx`) and `repo.json` downloading.
-- [ ] Implement `HlsPlaylistRewriter` and `/api/proxy/m3u8` + `/api/proxy/segment` with upstream `Referer` / `User-Agent` spoofing.
-- [ ] **Verification**: Run a sample `.cs3` plugin (e.g. NetMirror or VegaMovies from `nehal-CloudStream`), execute `loadLinks`, and verify stream playback via `curl` / VLC.
+- [x] Initialize `cloudstream-web/server` Gradle project with Ktor, OkHttp, and `software.coley.dextranslator`.
+- [x] Implement `ServerPluginLoader` porting `DesktopPluginLoader` logic for DEX-to-JVM translation.
+- [x] Implement `RepoManager` with shortcode resolution (`cspr`, `megarepo`, `phisherrepo`, `csx`) and `repo.json` downloading.
+- [x] Implement `HlsPlaylistRewriter` and `/api/proxy/m3u8` + `/api/proxy/segment` with upstream `Referer` / `User-Agent` spoofing.
+- [x] **Verification**: Run a sample `.cs3` plugin (e.g. NetMirror or VegaMovies from `nehal-CloudStream`), execute `loadLinks`, and verify stream playback via `curl` / VLC.
 
 ### Phase 2: Catalog, Search & Media Details API
-- [ ] Implement `/api/home` shelf route aggregating `getMainPage` across active providers.
-- [ ] Implement `/api/search` with coroutine parallelism and Server-Sent Events (SSE) streaming.
-- [ ] Implement `/api/quicksearch` for autocomplete suggestions.
-- [ ] Implement `/api/load` for movies and series (season/episode tree, metadata, cast).
-- [ ] Implement `/api/plugins` and `/api/repos` management routes.
-- [ ] **Verification**: Query `/api/search?q=batman` and verify progressive SSE response stream; verify `/api/load` returns complete episode lists.
+- [x] Implement `/api/home` shelf route aggregating `getMainPage` across active providers.
+- [x] Implement `/api/search` with coroutine parallelism and Server-Sent Events (SSE) streaming.
+- [x] Implement `/api/quicksearch` for autocomplete suggestions.
+- [x] Implement `/api/load` for movies and series (season/episode tree, metadata, cast).
+- [x] Implement `/api/plugins` and `/api/repos` management routes.
+- [x] **Verification**: Query `/api/search?q=batman` and verify progressive SSE response stream; verify `/api/load` returns complete episode lists.
 
 ### Phase 3: Web Client Shell, Catalog & Search UI
-- [ ] Initialize `cloudstream-web/web` Vite + React 18 + TypeScript project.
-- [ ] Implement dark cinema design system in CSS tokens (`#080B11` canvas, `#111625` card surface, Inter font, smooth animations).
-- [ ] Build `Navbar`, `Sidebar`, `MobileNav`, and `BillboardHero`.
-- [ ] Build `ShelfCarousel` and `MediaCard` with drag/touch scrolling.
-- [ ] Build `SearchBar`, `ProviderChips`, and `SearchResultsGrid` consuming the SSE stream.
-- [ ] **Verification**: Verify home page loads provider shelves; verify search streams cards in real-time as providers respond.
+- [x] Initialize `cloudstream-web/web` Vite + React 18 + TypeScript project.
+- [x] Implement dark cinema design system in CSS tokens (`#080B11` canvas, `#111625` card surface, Inter font, smooth animations).
+- [x] Build `Navbar`, `Sidebar`, `MobileNav`, and `BillboardHero`.
+- [x] Build `ShelfCarousel` and `MediaCard` with drag/touch scrolling.
+- [x] Build `SearchBar`, `ProviderChips`, and `SearchResultsGrid` consuming the SSE stream.
+- [x] **Verification**: Verify home page loads provider shelves; verify search streams cards in real-time as providers respond.
 
 ### Phase 4: Media Details & Cinema Video Player
-- [ ] Build `MediaHero`, `SeasonEpisodePicker` with filler episode badges, and `ProviderSwitcher`.
-- [ ] Build `CinemaVideoPlayer` with `hls.js`:
+- [x] Build `MediaHero`, `SeasonEpisodePicker` with filler episode badges, and `ProviderSwitcher`.
+- [x] Build `CinemaVideoPlayer` with `hls.js`:
   - Adaptive bitrate streaming & manual resolution selector.
   - Multi-audio track selector.
   - Extractor server switcher with auto-failover.
@@ -331,12 +331,9 @@ d:/Poject/CloudStream/cloudstream-web/
   - Playback speed (0.5x - 2.0x) and sleep timer.
   - Next episode auto-play countdown.
   - Full keyboard shortcuts.
-- [ ] **Verification**: Play an HLS stream requiring a protected referer; test quality switching, subtitle rendering, timing adjustment, and AniSkip overlays.
+- [x] **Verification**: Play an HLS stream requiring a protected referer; test quality switching, subtitle rendering, timing adjustment, and AniSkip overlays.
 
 ### Phase 5: Library, Sync, Plugins Marketplace & Data Backup
-- [ ] Build IndexedDB storage layer (`Dexie.js`) for continue watching, watch history, and categorized watchlists.
-- [ ] Implement AniList, MyAnimeList, Kitsu, and Simkl OAuth flow and 85% progress auto-scrobbling.
-- [ ] Build `PluginsView` and `RepoManagerModal` (add repos by URL or shortcode, browse plugins, install, update, toggle).
 - [ ] Build Backup & Restore service (export/import user data as JSON).
 - [ ] **Verification**: Add `cspr` repo shortcode; install a plugin; watch an episode and confirm progress resumes automatically; export backup and restore in clean session.
 
